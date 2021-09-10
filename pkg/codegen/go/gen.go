@@ -39,6 +39,7 @@ import (
 )
 
 type typeDetails struct {
+	inputType    bool
 	ptrElement   bool
 	arrayElement bool
 	mapElement   bool
@@ -1084,6 +1085,13 @@ func (pkg *pkgContext) genPlainType(w io.Writer, name, comment, deprecationMessa
 func (pkg *pkgContext) genInputTypes(w io.Writer, t *schema.ObjectType, details *typeDetails) {
 	contract.Assert(t.IsInputShape())
 
+	if !details.inputType {
+		if !strings.Contains(t.Token, "Response") {
+			fmt.Println(t.Token)
+		}
+		return
+	}
+
 	name := pkg.tokenToType(t.Token)
 
 	// Generate the plain inputs.
@@ -1189,7 +1197,7 @@ func (pkg *pkgContext) genOutputTypes(w io.Writer, genArgs genOutputTypesArgs) {
 			outputType, applyType := pkg.outputType(optionalType), pkg.typeString(optionalType)
 			deref := ""
 			// If the property was required, but the type it needs to return is an explicit pointer type, then we need
-			// to dereference it, unless it is a resource type which should remain a pointer.
+			// to dereference it, unless it is a resource type which should remain a pointerArrayMap.
 			_, isResourceType := p.Type.(*schema.ResourceType)
 			if p.IsRequired() && applyType[0] == '*' && !isResourceType {
 				deref = "&"
@@ -1846,7 +1854,7 @@ func (pkg *pkgContext) addSuffixesToName(typ schema.Type, name string) []string 
 // collectNestedCollectionTypes builds a deduped mapping of element types -> associated collection types.
 // different shapes of known types can resolve to the same element type. by collecting types in one step and emitting types
 // in a second step, we avoid collision and redeclaration.
-func (pkg *pkgContext) collectNestedCollectionTypes(types map[string]map[string]bool, typ schema.Type) {
+func (pkg *pkgContext) collectNestedCollectionTypes(types map[string]map[string]bool, typ schema.Type, input bool) {
 	var elementTypeName string
 	var names []string
 	switch t := typ.(type) {
@@ -1873,7 +1881,7 @@ func (pkg *pkgContext) collectNestedCollectionTypes(types map[string]map[string]
 		types[elementTypeName] = map[string]bool{}
 	}
 	for _, n := range names {
-		types[elementTypeName][n] = true
+		types[elementTypeName][n] = input
 	}
 }
 
@@ -1899,19 +1907,25 @@ func (pkg *pkgContext) genNestedCollectionTypes(w io.Writer, types map[string]ma
 		for _, name := range collectionTypes {
 			names = append(names, name)
 			if strings.HasSuffix(name, "Array") {
-				fmt.Fprintf(w, "type %s []%sInput\n\n", name, elementTypeName)
-				genInputImplementation(w, name, name, elementTypeName, false, false)
+				if types[elementTypeName][name] {
+					fmt.Fprintf(w, "type %s []%sInput\n\n", name, elementTypeName)
+					genInputImplementation(w, name, name, elementTypeName, false, false)
 
-				genArrayOutput(w, strings.TrimSuffix(name, "Array"), elementTypeName, false)
+					genArrayOutput(w, strings.TrimSuffix(name, "Array"), elementTypeName, false)
+				}
 			}
 
 			if strings.HasSuffix(name, "Map") {
-				fmt.Fprintf(w, "type %s map[string]%sInput\n\n", name, elementTypeName)
-				genInputImplementation(w, name, name, elementTypeName, false, false)
+				if types[elementTypeName][name] {
+					fmt.Fprintf(w, "type %s map[string]%sInput\n\n", name, elementTypeName)
+					genInputImplementation(w, name, name, elementTypeName, false, false)
 
-				genMapOutput(w, strings.TrimSuffix(name, "Map"), elementTypeName, false)
+					genMapOutput(w, strings.TrimSuffix(name, "Map"), elementTypeName, false)
+				}
 			}
-			pkg.genInputInterface(w, name)
+			if types[elementTypeName][name] {
+				pkg.genInputInterface(w, name)
+			}
 		}
 	}
 
@@ -2554,6 +2568,9 @@ func generatePackageContextMap(tool string, pkg *schema.Package, goInfo GoPackag
 
 		populateDetailsForPropertyTypes(seenMap, r.InputProperties, !r.IsProvider)
 		populateDetailsForPropertyTypes(seenMap, r.Properties, !r.IsProvider)
+		visitObjectTypes(r.InputProperties, func(t *schema.ObjectType) {
+			pkg.detailsForType(t).inputType = true
+		})
 
 		for _, method := range r.Methods {
 			if method.Function.Inputs != nil {
@@ -2686,6 +2703,14 @@ func generatePackageContextMap(tool string, pkg *schema.Package, goInfo GoPackag
 	}
 
 	return packages
+}
+
+func visitObjectTypes(properties []*schema.Property, visitor func(*schema.ObjectType)) {
+	codegen.VisitTypeClosure(properties, func(t schema.Type) {
+		if o, ok := t.(*schema.ObjectType); ok {
+			visitor(o)
+		}
+	})
 }
 
 // LanguageResource is derived from the schema and can be used by downstream codegen.
@@ -2898,7 +2923,7 @@ func GeneratePackage(tool string, pkg *schema.Package) (map[string][]byte, error
 			for _, t := range sortedKnownTypes {
 				switch typ := t.(type) {
 				case *schema.ArrayType, *schema.MapType:
-					pkg.collectNestedCollectionTypes(collectionTypes, typ)
+					pkg.collectNestedCollectionTypes(collectionTypes, typ, pkg.detailsForType(t).inputType)
 				}
 			}
 
