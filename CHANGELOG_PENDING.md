@@ -35,3 +35,6 @@
 
 - [auto/go] - Mark entire exported map as secret if key in map is secret.
   [#8179](https://github.com/pulumi/pulumi/pull/8179)
+
+- [docs] - Fix broken lists in dotnet docs
+  [docs#6558](https://github.com/pulumi/docs/issues/6558)
