@@ -94,6 +94,7 @@ class Server implements grpc.UntypedServiceImplementation {
         const resp = new provproto.ConfigureResponse();
         resp.setAcceptsecrets(true);
         resp.setAcceptresources(true);
+        resp.setAcceptoutputs(true);
         callback(undefined, resp);
     }
 
@@ -481,16 +482,31 @@ function configureRuntime(req: any, engineAddr: string) {
     runtime.setAllConfig(pulumiConfig, req.getConfigsecretkeysList());
 }
 
-// deserializeInputs deserializes the inputs struct and applies appropriate dependencies.
-async function deserializeInputs(inputsStruct: any, inputDependencies: any): Promise<Inputs> {
+/**
+ * deserializeInputs deserializes the inputs struct and applies appropriate dependencies.
+ * @internal
+ */
+export async function deserializeInputs(inputsStruct: any, inputDependencies: any): Promise<Inputs> {
     const result: Inputs = {};
-    const deserializedInputs = runtime.deserializeProperties(inputsStruct);
+
+    const gatheredPropDeps = new Map<string, Set<resource.URN>>();
+    const deserializedInputs = runtime.deserializeProperties(inputsStruct, gatheredPropDeps);
     for (const k of Object.keys(deserializedInputs)) {
-        const inputDeps = inputDependencies.get(k);
-        const depsUrns: resource.URN[] = inputDeps?.getUrnsList() ?? [];
-        const deps = depsUrns.map(depUrn => new resource.DependencyResource(depUrn));
         const input = deserializedInputs[k];
         const isSecret = runtime.isRpcSecret(input);
+        const depsUrns: resource.URN[] = inputDependencies.get(k)?.getUrnsList() ?? [];
+
+        // If the property dependencies are equal to or a subset of the gathered nested
+        // dependencies, we don't need to create a top-level output for the property
+        // because any nested output values will have already been deserialized as outputs.
+        const gatheredDeps = gatheredPropDeps.get(k);
+        if (!isSecret && gatheredDeps && gatheredDeps.size > 0 && contains(gatheredDeps, depsUrns)) {
+            result[k] = input;
+            continue;
+        }
+
+        // Otherwise, fallback to the previous behavior of creating a top-level output, if necessary.
+        const deps = depsUrns.map(depUrn => new resource.DependencyResource(depUrn));
         const isResourceReference = resource.Resource.isInstance(input)
             && depsUrns.length === 1
             && depsUrns[0] === await input.urn.promise();
@@ -505,7 +521,20 @@ async function deserializeInputs(inputsStruct: any, inputDependencies: any): Pro
                 Promise.resolve(isSecret), Promise.resolve([]));
         }
     }
+
     return result;
+}
+
+/**
+ * Returns true if the source has all items in other.
+ */
+function contains(source: Set<resource.URN>, other: resource.URN[]) {
+    for (const v of other) {
+        if (!source.has(v)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // grpcResponseFromError creates a gRPC response representing an error from a dynamic provider's

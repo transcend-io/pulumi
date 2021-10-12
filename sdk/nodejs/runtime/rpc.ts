@@ -174,13 +174,19 @@ export async function serializePropertiesReturnDeps(label: string, props: Inputs
 /**
  * deserializeProperties fetches the raw outputs and deserializes them from a gRPC call result.
  */
-export function deserializeProperties(outputsStruct: any): any {
+export function deserializeProperties(outputsStruct: any, propDeps?: Map<string, Set<URN>>): any {
     const props: any = {};
     const outputs: any = outputsStruct.toJavaScript();
     for (const k of Object.keys(outputs)) {
         // We treat properties with undefined values as if they do not exist.
         if (outputs[k] !== undefined) {
-            props[k] = deserializeProperty(outputs[k]);
+            let deps: Set<URN> | undefined = undefined;
+            if (propDeps) {
+                deps = new Set<URN>();
+                propDeps.set(k, deps);
+            }
+
+            props[k] = deserializeProperty(outputs[k], deps);
         }
     }
     return props;
@@ -530,7 +536,7 @@ export function unwrapRpcSecret(obj: any): any {
 /**
  * deserializeProperty unpacks some special types, reversing the above process.
  */
-export function deserializeProperty(prop: any): any {
+export function deserializeProperty(prop: any, deps?: Set<URN>): any {
     if (prop === undefined) {
         throw new Error("unexpected undefined property value during deserialization");
     }
@@ -547,7 +553,7 @@ export function deserializeProperty(prop: any): any {
         let hadSecret = false;
         const elems: any[] = [];
         for (const e of prop) {
-            prop = deserializeProperty(e);
+            prop = deserializeProperty(e, deps);
             hadSecret = hadSecret || isRpcSecret(prop);
             elems.push(unwrapRpcSecret(prop));
         }
@@ -583,7 +589,7 @@ export function deserializeProperty(prop: any): any {
                 if (prop["assets"]) {
                     const assets: asset.AssetMap = {};
                     for (const name of Object.keys(prop["assets"])) {
-                        const a = deserializeProperty(prop["assets"][name]);
+                        const a = deserializeProperty(prop["assets"][name], deps);
                         if (!(asset.Asset.isInstance(a)) && !(asset.Archive.isInstance(a))) {
                             throw new Error(
                                 "Expected an AssetArchive's assets to be unmarshaled Asset or Archive objects");
@@ -604,11 +610,13 @@ export function deserializeProperty(prop: any): any {
             case specialSecretSig:
                 return {
                     [specialSigKey]: specialSecretSig,
-                    value: deserializeProperty(prop["value"]),
+                    value: deserializeProperty(prop["value"], deps),
                 };
             case specialResourceSig:
                 // Deserialize the resource into a live Resource reference
                 const urn = prop["urn"];
+                deps?.add(urn);
+
                 const version = prop["packageVersion"];
 
                 const urnParts = urn.split("::");
@@ -637,7 +645,7 @@ export function deserializeProperty(prop: any): any {
                 // If we've made it here, deserialize the reference as either a URN or an ID (if present).
                 if (prop["id"]) {
                     const id = prop["id"];
-                    return deserializeProperty(id === "" ? unknownValue : id);
+                    return deserializeProperty(id === "" ? unknownValue : id, deps);
                 }
                 return urn;
 
@@ -645,15 +653,19 @@ export function deserializeProperty(prop: any): any {
                 let value = prop["value"];
                 const isKnown = value !== undefined;
                 if (isKnown) {
-                    value = deserializeProperty(value);
+                    value = deserializeProperty(value, deps);
                 }
 
                 const isSecret = prop["secret"] === true;
 
                 const dependencies = prop["dependencies"];
-                const resources = Array.isArray(dependencies)
-                    ? dependencies.map(d => new DependencyResource(d))
-                    : [];
+                const resources: Resource[] = [];
+                if (Array.isArray(dependencies)) {
+                    for (const d of dependencies) {
+                        deps?.add(d);
+                        resources.push(new DependencyResource(d));
+                    }
+                }
 
                 return new Output(resources, Promise.resolve(value), Promise.resolve(isKnown),
                     Promise.resolve(isSecret), Promise.resolve([]));
@@ -670,7 +682,7 @@ export function deserializeProperty(prop: any): any {
         let hadSecrets = false;
 
         for (const k of Object.keys(prop)) {
-            const o = deserializeProperty(prop[k]);
+            const o = deserializeProperty(prop[k], deps);
             hadSecrets = hadSecrets || isRpcSecret(o);
             obj[k] = unwrapRpcSecret(o);
         }
