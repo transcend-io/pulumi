@@ -78,7 +78,7 @@ jobs:
           make -C sdk/${{ matrix.language}} publish
   publish-binaries:
     name: Publish Binaries
-    runs-on: macos-latest
+    runs-on: macos-10.15
     needs: [build-and-test, windows-build]
     strategy:
       matrix:
