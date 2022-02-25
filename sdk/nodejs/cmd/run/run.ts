@@ -173,6 +173,13 @@ export function run(
         process.chdir(pwd);
     }
 
+    let program: string = argv._[0];
+    if (program.indexOf("/") !== 0) {
+        // If this isn't an absolute path, make it relative to the working directory.
+        program = path.join(process.cwd(), program);
+    }
+    const projectRoot = projectRootFromProgramPath(program);
+
     // If this is a typescript project, we'll want to load node-ts.
     const typeScript: boolean = process.env["PULUMI_NODEJS_TYPESCRIPT"] === "true";
 
@@ -182,7 +189,8 @@ export function run(
     // if there's a tsconfig.json file here. Otherwise, just tell ts-node to not load project options at all.
     // This helps with cases like pulumi/pulumi#1772.
     const defaultTsConfigPath = "tsconfig.json";
-    const tsConfigPath: string = process.env["PULUMI_NODEJS_TSCONFIG_PATH"] ?? defaultTsConfigPath;
+    const rootTsConfigPath = path.join(projectRoot, "tsconfig.json");
+    const tsConfigPath: string = process.env["PULUMI_NODEJS_TSCONFIG_PATH"] ?? fs.existsSync(rootTsConfigPath) ? rootTsConfigPath : defaultTsConfigPath;
     const skipProject = !fs.existsSync(tsConfigPath);
 
     const transpileOnly = (process.env["PULUMI_NODEJS_TRANSPILE_ONLY"] ?? "false") === "true";
@@ -210,12 +218,6 @@ export function run(
             files: true,
             compilerOptions,
         });
-    }
-
-    let program: string = argv._[0];
-    if (!path.isAbsolute(program)) {
-        // If this isn't an absolute path, make it relative to the working directory.
-        program = path.join(process.cwd(), program);
     }
 
     // Now fake out the process-wide argv, to make the program think it was run normally.
