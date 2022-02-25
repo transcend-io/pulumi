@@ -185,38 +185,31 @@ export function run(
     // Since that change, Pulumi added the option to not typecheck
     //
     // It is quite opinionated and odd to not support standard tsconfig.json rules, but then to default to typechecking.
+    //
+    // The main reasons for not using newer ts-node versions, which support scoping typechecking, are performance related:
+    // - first upgrade to ts-node to version 8: https://github.com/pulumi/pulumi/pull/3627/files
+    // - Issue opened that startups are slow: https://github.com/pulumi/pulumi/issues/3671
+    // - Comment from JoeDuffy that the lines reading in tsconfig files are non-performant: https://github.com/pulumi/pulumi/issues/3671#issuecomment-584718728
+    // - Comment from Luke Hoban that the ts-node bump caused the perf decrease: https://github.com/pulumi/pulumi/issues/3671#issuecomment-592810579
+    // - PR from Luke Hoban moving the ts-node version back down: https://github.com/pulumi/pulumi/pull/4007
 
-    // We provide reasonable defaults for many ts options, meaning you don't need to have a tsconfig.json present
-    // if you want to use TypeScript with Pulumi. However, ts-node's default behavior is to walk up from the cwd to
-    // find a tsconfig.json. For us, it's reasonable to say that the "root" of the project is the cwd,
-    // if there's a tsconfig.json file here. Otherwise, just tell ts-node to not load project options at all.
-    // This helps with cases like pulumi/pulumi#1772.
-    const defaultTsConfigPath = "tsconfig.json";
-    const tsConfigPath: string = process.env["PULUMI_NODEJS_TSCONFIG_PATH"] ?? defaultTsConfigPath;
-
-    const transpileOnly = (process.env["PULUMI_NODEJS_TRANSPILE_ONLY"] ?? "false") === "true";
-
-    const defaultCompilerOptions = {
-        target: "es6",
-        module: "commonjs",
-        moduleResolution: "node",
-        sourceMap: "true",
-    }
-    let compilerOptions: object;
-    try {
-        const tsConfigString = fs.readFileSync(tsConfigPath).toString();
-        const tsConfig = parseConfigFileTextToJson(tsConfigPath, tsConfigString).config;
-        compilerOptions = tsConfig["compilerOptions"] ?? defaultCompilerOptions;
-    } catch (e) {
-        compilerOptions = defaultCompilerOptions;
-    }
-
+    // - Attempted increase in version: https://github.com/pulumi/pulumi/pull/7828
+    // - Closed after seeing a perf increase: https://github.com/pulumi/pulumi/pull/7828#issuecomment-904994057
     if (typeScript) {
         tsnode.register({
-            typeCheck: !transpileOnly,
-            transpileOnly,
+            typeCheck: false,
+            transpileOnly: true,
+            swc: true,
+            project: process.env["PULUMI_NODEJS_TSCONFIG_PATH"], // will be undefined most of the time
+            scopeDir: pwd,
+            scope: true,
             files: true,
-            compilerOptions,
+            compilerOptions: {
+                target: "es6",
+                module: "commonjs",
+                moduleResolution: "node",
+                sourceMap: "true",
+            },
         });
     }
 

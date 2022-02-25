@@ -1,6 +1,6 @@
 {
     "name": "@transcend-io/pulumi",
-    "version": "1.0.14",
+    "version": "1.0.15",
     "description": "Pulumi's Node.js SDK, forked by transcend-io",
     "license": "Apache-2.0",
     "repository": {
@@ -41,12 +41,13 @@
         "mockpackage": "file:tests/mockpackage",
         "nyc": "^15.1.0",
         "mocha": "^9.0.0",
-        "ts-node": "^7.0.1",
-        "typescript": "~3.7.3"
+        "ts-node": "^10.5.0",
+        "@swc/core": "^1.2.145",
+        "typescript": "~3.8.3"
     },
     "peerDependencies": {
-        "ts-node": ">7.0.1",
-        "typescript": ">3.7.3"
+        "ts-node": ">10.5.0",
+        "typescript": ">3.8.3"
     },
     "pulumi": {
         "comment": "Do not remove. Marks this as as a deployment-time-only package"
