@@ -205,7 +205,7 @@ export function run(
     if (typeScript) {
         tsnode.register({
             typeCheck: !transpileOnly,
-            skipProject,
+            project: tsConfigPath,
             transpileOnly,
             files: true,
             compilerOptions,
