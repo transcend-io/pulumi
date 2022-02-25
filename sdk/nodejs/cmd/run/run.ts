@@ -212,12 +212,6 @@ export function run(
             scopeDir: pwd,
             scope: true,
             files: true,
-            compilerOptions: {
-                target: "es6",
-                module: "commonjs",
-                moduleResolution: "node",
-                sourceMap: "true",
-            },
         });
     }
 
