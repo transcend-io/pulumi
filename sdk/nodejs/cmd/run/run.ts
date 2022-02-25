@@ -209,9 +209,6 @@ export function run(
             transpileOnly: true,
             swc: true,
             project: process.env["PULUMI_NODEJS_TSCONFIG_PATH"], // will be undefined most of the time
-            scopeDir: pwd,
-            scope: true,
-            files: true,
         });
     }
 
