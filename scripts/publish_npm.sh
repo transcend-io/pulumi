@@ -9,7 +9,7 @@ echo "Publishing NPM package to NPMjs.com:"
 NPM_TAG="latest"
 
 PKG_NAME="@transcend-io/pulumi"
-PKG_VERSION="1.0.15"
+PKG_VERSION="1.0.16"
 
 # Now, perform the publish. The logic here is a little goofy because npm provides
 # no way to say "if the package already exists, don't fail" but we want these

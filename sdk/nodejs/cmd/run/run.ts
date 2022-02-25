@@ -192,7 +192,9 @@ export function run(
     // - Comment from JoeDuffy that the lines reading in tsconfig files are non-performant: https://github.com/pulumi/pulumi/issues/3671#issuecomment-584718728
     // - Comment from Luke Hoban that the ts-node bump caused the perf decrease: https://github.com/pulumi/pulumi/issues/3671#issuecomment-592810579
     // - PR from Luke Hoban moving the ts-node version back down: https://github.com/pulumi/pulumi/pull/4007
-
+    //
+    // - Issue created suggesting to revisit the ts-node version: https://github.com/pulumi/pulumi/issues/4876
+    //
     // - Attempted increase in version: https://github.com/pulumi/pulumi/pull/7828
     // - Closed after seeing a perf increase: https://github.com/pulumi/pulumi/pull/7828#issuecomment-904994057
     if (typeScript) {
