@@ -174,40 +174,16 @@ export function run(
     }
 
     // If this is a typescript project, we'll want to load node-ts.
-    const typeScript: boolean = process.env["PULUMI_NODEJS_TYPESCRIPT"] === "true";
+    const typeScript = process.env["PULUMI_NODEJS_TYPESCRIPT"] === "true";
 
-    // At one point in time, someone put a tsconfig.json file in their home directory, and pulumi tried compiling all typescript under that dir, which just caused
-    // Pulumi to hang for them (https://github.com/pulumi/pulumi/issues/1772). As a solution, https://github.com/pulumi/pulumi/pull/1857 broke how typescript normally works by only looking for tsconfig.json
-    // files in the directory of the main pulumi file.
-    //
-    // We really shouldn't mind finding a tsconfig.json in the parent though in most cases, as that is what "standard" ts-node would normally do
-    //
-    // Since that change, Pulumi added the option to not typecheck
-    //
-    // It is quite opinionated and odd to not support standard tsconfig.json rules, but then to default to typechecking.
-    //
-    // The main reasons for not using newer ts-node versions, which support scoping typechecking, are performance related:
-    // - first upgrade to ts-node to version 8: https://github.com/pulumi/pulumi/pull/3627/files
-    // - Issue opened that startups are slow: https://github.com/pulumi/pulumi/issues/3671
-    // - Comment from JoeDuffy that the lines reading in tsconfig files are non-performant: https://github.com/pulumi/pulumi/issues/3671#issuecomment-584718728
-    // - Comment from Luke Hoban that the ts-node bump caused the perf decrease: https://github.com/pulumi/pulumi/issues/3671#issuecomment-592810579
-    // - PR from Luke Hoban moving the ts-node version back down: https://github.com/pulumi/pulumi/pull/4007
-    //
-    // - Issue created suggesting to revisit the ts-node version: https://github.com/pulumi/pulumi/issues/4876
-    //
-    // - Attempted increase in version: https://github.com/pulumi/pulumi/pull/7828
-    // - Closed after seeing a perf increase: https://github.com/pulumi/pulumi/pull/7828#issuecomment-904994057
-    //
-    // - Suggestion for using something like esbuild without typechecking: https://github.com/pulumi/pulumi/issues/4876#issuecomment-1028616028
-    // - PR that allows turning typechecking off (still enabled by default): https://github.com/pulumi/pulumi/pull/8981
-
-
+    // Users can optionally disable typechecking when using typescript projects 
+    const transpileOnly = process.env["PULUMI_NODEJS_TRANSPILE_ONLY"] === "true";
 
     if (typeScript) {
         tsnode.register({
-            typeCheck: false,
-            transpileOnly: true,
-            swc: true,
+            typeCheck: !transpileOnly,
+            transpileOnly,
+            swc: transpileOnly,
             project: process.env["PULUMI_NODEJS_TSCONFIG_PATH"], // will be undefined most of the time
         });
     }
