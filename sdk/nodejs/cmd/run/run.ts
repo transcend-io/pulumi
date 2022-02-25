@@ -177,7 +177,7 @@ export function run(
     const typeScript: boolean = process.env["PULUMI_NODEJS_TYPESCRIPT"] === "true";
 
     // At one point in time, someone put a tsconfig.json file in their home directory, and pulumi tried compiling all typescript under that dir, which just caused
-    // Pulumi to hang for them. As a solution, https://github.com/pulumi/pulumi/pull/1857 broke how typescript normally works by only looking for tsconfig.json
+    // Pulumi to hang for them (https://github.com/pulumi/pulumi/issues/1772). As a solution, https://github.com/pulumi/pulumi/pull/1857 broke how typescript normally works by only looking for tsconfig.json
     // files in the directory of the main pulumi file.
     //
     // We really shouldn't mind finding a tsconfig.json in the parent though in most cases, as that is what "standard" ts-node would normally do
@@ -197,6 +197,12 @@ export function run(
     //
     // - Attempted increase in version: https://github.com/pulumi/pulumi/pull/7828
     // - Closed after seeing a perf increase: https://github.com/pulumi/pulumi/pull/7828#issuecomment-904994057
+    //
+    // - Suggestion for using something like esbuild without typechecking: https://github.com/pulumi/pulumi/issues/4876#issuecomment-1028616028
+    // - PR that allows turning typechecking off (still enabled by default): https://github.com/pulumi/pulumi/pull/8981
+
+
+
     if (typeScript) {
         tsnode.register({
             typeCheck: false,
