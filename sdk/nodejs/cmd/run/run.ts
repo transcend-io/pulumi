@@ -183,8 +183,7 @@ export function run(
     // This helps with cases like pulumi/pulumi#1772.
     const defaultTsConfigPath = "tsconfig.json";
     const tsConfigPath: string = process.env["PULUMI_NODEJS_TSCONFIG_PATH"] ?? defaultTsConfigPath;
-    // const skipProject = !fs.existsSync(tsConfigPath);
-    const skipProject = false;
+    let skipProject: boolean;
 
     const transpileOnly = (process.env["PULUMI_NODEJS_TRANSPILE_ONLY"] ?? "false") === "true";
 
@@ -199,8 +198,10 @@ export function run(
         const tsConfigString = fs.readFileSync(tsConfigPath).toString();
         const tsConfig = parseConfigFileTextToJson(tsConfigPath, tsConfigString).config;
         compilerOptions = tsConfig["compilerOptions"] ?? defaultCompilerOptions;
+        skipProject = false;
     } catch (e) {
         compilerOptions = defaultCompilerOptions;
+        skipProject = true;
     }
 
     if (typeScript) {
