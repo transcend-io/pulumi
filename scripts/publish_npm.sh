@@ -5,42 +5,10 @@ set -euo pipefail
 readonly ROOT=$(dirname "${0}")/..
 
 echo "Publishing NPM package to NPMjs.com:"
-NPM_TAG="dev"
+NPM_TAG="latest"
 
-## We need split the GIT_REF into the correct parts
-## so that we can test for NPM Tags
-IFS='/' read -ra my_array <<< "${GIT_REF:-}"
-last_index=$((${#my_array[@]} - 1))
-BRANCH_NAME="${my_array[last_index]}"
-
-echo $BRANCH_NAME
-if [[ "${BRANCH_NAME}" == features/* ]]; then
-    NPM_TAG=$(echo "${BRANCH_NAME}" | sed -e 's|^features/|feature-|g')
-fi
-
-if [[ "${BRANCH_NAME}" == feature-* ]]; then
-    NPM_TAG="${BRANCH_NAME}"
-fi
-
-PKG_NAME=$(jq -r .name < "${ROOT}/sdk/nodejs/package.json")
-# shellcheck disable=SC2154 # assigned by release.yml
-PKG_VERSION="${PULUMI_VERSION}"
-
-# If the package doesn't have an alpha tag, use the tag of latest instead of
-# dev. NPM uses this tag as the default version to add, so we want it to mean
-# the newest released version.
-if [[ "${PKG_VERSION}" != *-alpha* ]]; then
-    NPM_TAG="latest"
-fi
-
-# we need to set explicit beta and rc tags to ensure that we don't mutate to use the latest tag
-if [[ "${PKG_VERSION}" == *-beta* ]]; then
-    NPM_TAG="beta"
-fi
-
-if [[ "${PKG_VERSION}" == *-rc* ]]; then
-    NPM_TAG="rc"
-fi
+PKG_NAME="@transcend-io/pulumi"
+PKG_VERSION="1.0.24"
 
 # Now, perform the publish. The logic here is a little goofy because npm provides
 # no way to say "if the package already exists, don't fail" but we want these
@@ -51,14 +19,7 @@ fi
 #
 # We exploit the fact that `npm info <package-name>@<package-version>` has no output
 # when the package does not exist.
-set -x
-if [ "$(npm info "${PKG_NAME}@${PKG_VERSION}")" == "" ]; then
-    if ! npm publish -tag "${NPM_TAG}" "${ROOT}"/artifacts/sdk-nodejs-*.tgz ; then
-    # if we get here, we have a TOCTOU issue, so check again
-    # to see if it published. If it didn't bail out.
-        if [ "$(npm info "${PKG_NAME}@${PKG_VERSION}")" == "" ]; then
-            echo "NPM publishing failed, aborting"
-            exit 1
-        fi
-    fi
-fi
+pushd "${ROOT}/sdk/nodejs/bin"
+npm publish -tag "${NPM_TAG}" --access=public
+npm info 2>/dev/null
+popd
