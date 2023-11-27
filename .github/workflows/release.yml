@@ -77,59 +77,33 @@ jobs:
         with:
           node-version: ${{ fromJson(inputs.version-set).nodejs }}
           registry-url: https://registry.npmjs.org
+          cache: yarn
+          cache-dependency-path: sdk/nodejs/yarn.lock
           always-auth: true
+      - name: Install yarn
+        run: |
+          npm install -g yarn
+      # TODO something in `cd sdk/nodejs && make ensure` executes Go
+      # downloads, which is unfortunate and wasteful in this context.
+      # When this is fixed the no-op Go command can be removed.
+      - name: Make no-op Go command to avoid Go builds
+        run: |
+          cd sdk/nodejs
+          mkdir -p bin
+          # shellcheck disable=SC2230 # need to locate echo binary
+          ln -s "$(which echo)" bin/go
+      - name: Ensure installed dependencies
+        run: |
+          cd sdk/nodejs
+          PATH=./bin:$PATH make ensure
+      - name: Build the Node SDK package
+        run: |
+          cd sdk/nodejs
+          PATH=./bin:$PATH make build_package
+      - name: Pack the Node SDK
+        run: |
+          cd sdk/nodejs/bin
+          npm pack
       - name: Publish Packages
         run: |
           make -C sdk/${{ matrix.language}} publish
-
-  pr:
-    # Relies on the Go SDK being published to update pkg
-    name: PR
-    needs: [sdks]
-    uses: ./.github/workflows/release-pr.yml
-    permissions:
-      contents: write
-      pull-requests: write
-    with:
-      ref: ${{ inputs.ref }}
-      version: ${{ inputs.version }}
-      release-notes: ${{ inputs.release-notes }}
-      queue-merge: ${{ inputs.queue-merge }}
-    secrets: inherit
-
-  dispatch:
-    name: ${{ matrix.job.name }}
-    if: inputs.run-dispatch-commands && !contains(inputs.version, '-')
-    runs-on: ubuntu-latest
-    needs: [pr]
-    strategy:
-      fail-fast: false
-      matrix:
-        job:
-          - name: Update Templates Version
-            run-command: pulumictl dispatch -r pulumi/templates -c update-templates "${PULUMI_VERSION}"
-          - name: Chocolatey Update
-            run-command: pulumictl create choco-deploy "${PULUMI_VERSION}"
-          - name: Winget Update
-            run-command: pulumictl winget-deploy
-          - name: Build Package Docs
-            run-command: pulumictl create cli-docs-build "${PULUMI_VERSION}"
-          - name: Homebrew
-            run-command: pulumictl create homebrew-bump "${PULUMI_VERSION}" "$(git rev-parse HEAD)"
-          - name: Docker containers
-            run-command: pulumictl dispatch -r pulumi/pulumi-docker-containers -c release-build "${PULUMI_VERSION}"
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ inputs.ref }}
-      - name: Install Pulumictl
-        uses: jaxxstorm/action-install-gh-release@v1.7.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.PULUMI_BOT_TOKEN }}
-        with:
-          repo: pulumi/pulumictl
-          tag: v0.0.42
-          cache: enable
-      - name: Repository Dispatch
-        run: ${{ matrix.job.run-command }}
