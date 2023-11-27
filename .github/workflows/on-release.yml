@@ -18,7 +18,6 @@ concurrency: release
 jobs:
   release:
     name: release
-    needs: [info]
     uses: ./.github/workflows/release.yml
     with:
       ref: ${{ github.ref }}
