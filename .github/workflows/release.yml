@@ -53,11 +53,10 @@ env:
   PULUMI_VERSION: ${{ inputs.version }}
   GIT_REF: ${{ inputs.ref }}
   GITHUB_TOKEN: ${{ secrets.PULUMI_BOT_TOKEN }}
-  PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_PROD_ACCESS_TOKEN }}
+  PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
   PULUMI_TEST_OWNER: "moolumi"
   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
   NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-  PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
 
 jobs:
   sdks:
@@ -66,22 +65,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ["nodejs", "python", "go"]
+        language: ["nodejs"]
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
         with:
           ref: ${{ inputs.ref }}
-      - name: Set up Python ${{ fromJson(inputs.version-set).python }}
-        if: ${{ matrix.language == 'python' }}
-        uses: actions/setup-python@v3
-        with:
-          python-version: ${{ fromJson(inputs.version-set).python }}
-          cache-dependency-path: sdk/python/requirements.txt
-      - name: Install Python deps
-        if: ${{ matrix.language == 'python' }}
-        run: |
-          python -m pip install --upgrade pip requests wheel urllib3 chardet twine
       - name: Set up Node ${{ fromJson(inputs.version-set).nodejs }}
         if: ${{ matrix.language == 'nodejs' }}
         uses: actions/setup-node@v3
