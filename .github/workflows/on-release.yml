@@ -6,37 +6,24 @@ permissions:
   pull-requests: write
 
 on:
-  release:
-    types:
-      - released
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+        type: string
+        description: Pulumi override verison to release
 
 concurrency: release
 
 jobs:
-  info:
-    name: gather
-    runs-on: ubuntu-latest
-    outputs:
-      version: "${{ fromJSON(steps.version.outputs.version) }}"
-    steps:
-      - uses: actions/checkout@v3
-        # Uses release ref (tag)
-      - name: Info
-        id: version
-        run: |
-          TAG="${{ github.event.release.tag_name }}"
-          PULUMI_VERSION="${TAG#v}" # remove prefix
-
-          ./.github/scripts/set-output version "${PULUMI_VERSION}"
-
   release:
     name: release
     needs: [info]
     uses: ./.github/workflows/release.yml
     with:
-      ref: ${{ github.event.release.tag_name }}
-      version: ${{ needs.info.outputs.version }}
-      release-notes: ${{ github.event.release.body }}
+      ref: ${{ github.ref }}
+      version: ${{ inputs.version }}
+      release-notes: Releasing version ${{ inputs.version }}
       queue-merge: true
       run-dispatch-commands: true
     secrets: inherit
