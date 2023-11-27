@@ -28,6 +28,7 @@ import * as settings from "../../runtime/settings";
 import * as stack from "../../runtime/stack";
 import * as tsutils from "../../tsutils";
 import * as tracing from "./tracing";
+import * as typescript from "typescript";
 
 import * as mod from ".";
 
